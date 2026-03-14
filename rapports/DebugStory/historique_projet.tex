@@ -75,9 +75,20 @@
 % ════════════════════════════════════════════════════════════════════════════
 \section{Genèse et motivations}
 
-Les outils classiques de gestion de vulnérabilités (Dependabot, Snyk...) signalent une CVE dès qu'une bibliothèque est dans une plage de versions affectées. Ils ne tiennent pas compte du contexte réel d'utilisation dans le code source : la fonctionnalité vulnérable est-elle réellement appelée ? Les données contrôlées par l'attaquant atteignent-elles le sink vulnérable ? Des mitigations sont-elles en place ?
+Les outils classiques de gestion de vulnérabilités (Dependabot, Snyk...) signalent 
+une CVE dès qu'une bibliothèque est dans une plage de versions affectées. Ils ne 
+tiennent pas compte du contexte réel d'utilisation dans le code source : la 
+fonctionnalité vulnérable est-elle réellement appelée ? Les données contrôlées par 
+l'attaquant atteignent-elles le sink vulnérable ? Des mitigations sont-elles en place ?
 
-L'idée d'Argus est de répondre à cette question grâce à l'IA, tout en respectant une contrainte forte : en contexte entreprise, le code source ne doit pas quitter le serveur local. Toute l'architecture du projet découle de cette contrainte.
+Cette approche génère un volume important de faux positifs. Pour une entreprise, 
+cela se traduit concrètement par du temps perdu à trier des alertes non exploitables, 
+une difficulté à prioriser les vraies menaces, et un risque de \textit{alert fatigue} 
+qui pousse les équipes à ignorer des vulnérabilités réellement critiques.
+
+L'idée d'Argus est de répondre à cette question grâce à l'IA, tout en respectant 
+une contrainte forte : en contexte entreprise, le code source ne doit pas quitter 
+le serveur local. Toute l'architecture du projet découle de cette contrainte.
 
 % ════════════════════════════════════════════════════════════════════════════
 \section{Construction du graphe d'appels et premières frictions}
