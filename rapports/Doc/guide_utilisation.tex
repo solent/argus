@@ -1,0 +1,271 @@
+\documentclass[a4paper, 12pt, hidelinks]{article}
+\usepackage{bookmark}
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage{lmodern}
+\usepackage{graphicx}
+\usepackage[french]{babel}
+\usepackage{geometry}
+\usepackage{caption}
+\usepackage{float}
+\usepackage{url}
+\usepackage{color}
+\usepackage{hyperref}
+\usepackage{setspace}
+\usepackage{fancyhdr}
+\usepackage{mdframed}
+\usepackage{libertine}
+\usepackage{tabularx}
+\usepackage{listings}
+\usepackage{booktabs}
+\pagestyle{fancy}
+\setlength{\marginparwidth}{10pt}
+\setlength{\textwidth}{550pt}
+\setlength{\headheight}{26pt}
+\renewcommand{\headrulewidth}{1pt}
+\fancyhead[C]{}
+\fancyhead[L]{\includegraphics[width = 0.07\textwidth]{entete.png}}
+\fancyhead[R]{\textbf{Argus -- Guide d'utilisation}}
+\renewcommand{\footrulewidth}{1pt}
+\fancyfoot[L]{\textbf{page \thepage}}
+\fancyfoot[C]{}
+\fancyfoot[R]{SCHOBERT Néo}
+\renewcommand{\thesection}{\Roman{section}}
+\definecolor{CornflowerBlue}{rgb}{0.392,0.584,0.929}
+\definecolor{LightBlue}{RGB}{230, 242, 249}
+\definecolor{LightYellow}{RGB}{255, 251, 230}
+\geometry{hmargin=2.5cm,vmargin=2cm}
+\setstretch{1.15}
+\definecolor{codebg}{RGB}{248,248,248}
+\lstset{
+  language=bash,
+  backgroundcolor=\color{codebg},
+  basicstyle=\ttfamily\small,
+  frame=single,
+  breaklines=true,
+  captionpos=b,
+}
+\setlength{\parindent}{0cm}
+\setlength{\parskip}{1ex plus 0.5ex minus 0.2ex}
+\newcommand{\HRule}{\rule{\linewidth}{0.5mm}}
+
+\begin{document}
+
+\begin{titlepage}
+  \begin{sffamily}
+  \begin{center}
+    \includegraphics[scale=1]{entete.png}~\\[1.5cm]
+    \textsc{\LARGE IMT Atlantique}\\[2cm]
+    \textsc{\Large Projet Procom}\\[1.5cm]
+    \HRule \\[0.4cm]
+    { \huge \bfseries Argus\\[0.2cm] }
+    { \Large \bfseries Guide d'utilisation\\[0.4cm] }
+    \HRule \\[2cm]
+    \begin{minipage}{0.4\textwidth}
+      \begin{flushleft} \large
+        SCHOBERT Néo\\
+        EL AKRABA Othmane\\
+        AYOUBI Houcine\\
+        TRAORE Idrissa\\
+      \end{flushleft}
+    \end{minipage}
+    \begin{minipage}{0.4\textwidth}
+      \begin{flushright} \large
+        \textbf{Argus -- Documentation}
+      \end{flushright}
+    \end{minipage}
+    \vfill
+  \end{center}
+  \end{sffamily}
+\end{titlepage}
+
+\tableofcontents
+\newpage
+
+% ════════════════════════════════════════════════════════════════════════════
+\section{Prérequis}
+
+\subsection*{Dépendances logicielles}
+
+\begin{itemize}
+  \item Docker et Docker Compose
+  \item Un serveur Ollama accessible (local ou distant) hébergeant un modèle compatible (voir §\ref{sec:config})
+\end{itemize}
+
+\subsection*{Clés API}
+
+Argus nécessite deux clés API externes :
+
+\begin{table}[H]
+  \centering
+  \begin{tabularx}{\textwidth}{l l X}
+    \toprule
+    \textbf{Service} & \textbf{Obligatoire} & \textbf{Usage} \\
+    \midrule
+    OpenRouter & \textbf{Oui} & Résolution de bibliothèques, enrichissement CVE, juges de benchmarking \\
+    NVD (NIST) & Non & Augmente le rate limit CVE de 10 req/min à 120 req/min \\
+    \bottomrule
+  \end{tabularx}
+\end{table}
+
+\begin{itemize}
+  \item \textbf{OpenRouter} : \url{https://openrouter.ai} $\rightarrow$ créer un compte $\rightarrow$ API Keys $\rightarrow$ créer une clé
+  \item \textbf{NVD} : \url{https://nvd.nist.gov/developers/request-an-api-key} $\rightarrow$ formulaire simple, clé reçue par e-mail
+\end{itemize}
+
+% ════════════════════════════════════════════════════════════════════════════
+\section{Configuration}
+\label{sec:config}
+
+\subsection*{Fichier \texttt{backend/.env}}
+
+Créer (ou éditer) le fichier \texttt{backend/.env} à la racine du dossier \texttt{backend/} :
+
+\begin{lstlisting}[caption={backend/.env -- configuration complete}]
+# -- Obligatoire ------------------------------------------------
+# Cle OpenRouter : resolution de bibliotheques, enrichissement CVE,
+# modeles juges (benchmarking)
+OPENROUTER_API_KEY=sk-or-v1-...
+
+# -- Optionnel --------------------------------------------------
+# Cle NVD : augmente le rate limit de 10 req/min a 120 req/min
+# Sans cle : delai de 6s entre requetes CVE
+# Avec cle  : delai de 0.6s
+NVD_API_KEY=
+
+# -- Modele on-premise ------------------------------------------
+# URL de votre serveur Ollama (compatible OpenAI /v1)
+ON_PREMISE_BASE_URL=http://<votre-serveur-ollama>/v1
+
+# Modele a utiliser (voir contraintes ci-dessous)
+ON_PREMISE_MODEL=devstral:24b
+
+# Cle d'authentification -- laisser vide si Ollama sans auth
+ON_PREMISE_API_KEY=
+
+# -- Debug ------------------------------------------------------
+# 0 : mode normal (logs minimaux)
+# 1 : affiche chaque prompt envoye au LLM ET sa reponse brute dans stdout
+DEBUG_AI=0
+\end{lstlisting}
+
+\subsection*{Choix du modèle on-premise}
+\label{sec:modele}
+
+\textbf{Tous les modèles ne sont pas utilisables.} Le modèle on-premise doit disposer d'une fenêtre de contexte suffisante et de bonnes capacités de raisonnement sur le code. En dessous de 24B paramètres, les modèles manquent les chemins de taint et peinent à produire du JSON structuré.
+
+\begin{table}[H]
+  \centering
+  \begin{tabularx}{\textwidth}{l l X}
+    \toprule
+    \textbf{Modèle} & \textbf{Qualité} & \textbf{Remarque} \\
+    \midrule
+    \texttt{devstral:24b} & \textbf{Recommandé} & Spécialisé code, meilleur alignement avec les juges \\
+    \texttt{qwen3:32b}    & Bon                 & Solide en raisonnement général + code \\
+    \texttt{gpt-oss:20b}  & Déconseillé         & Variance élevée entre exécutions, sous-évalue systématiquement \\
+    Autres modèles 24B+   & À benchmarker       & Utiliser le workflow Test pour évaluer objectivement tout nouveau modèle \\
+    \bottomrule
+  \end{tabularx}
+  \caption{Modèles on-premise testés avec Argus}
+\end{table}
+
+Tout modèle de taille suffisante (24B paramètres minimum) exposant une API compatible OpenAI sur \texttt{/v1} peut être utilisé.
+
+\subsection*{La variable \texttt{DEBUG\_AI}}
+
+\texttt{DEBUG\_AI=1} active une journalisation complète de tous les échanges avec les LLMs : chaque prompt envoyé et chaque réponse brute sont affichés dans la sortie standard (\texttt{stdout}) du backend.
+
+C'est l'outil de diagnostic principal pour comprendre :
+\begin{itemize}
+  \item Pourquoi un modèle produit un score inattendu
+  \item Si le JSON retourné est correctement formé
+  \item Quelles informations CVE ont été injectées dans le prompt
+  \item Si le modèle on-premise reçoit bien les données (et non un timeout silencieux)
+\end{itemize}
+
+\begin{mdframed}[backgroundcolor=LightBlue]
+\textbf{En production}, laisser \texttt{DEBUG\_AI=0}. Avec \texttt{DEBUG\_AI=1}, les logs peuvent atteindre plusieurs milliers de lignes pour un projet de taille moyenne et exposent le contenu des prompts.
+\end{mdframed}
+
+\subsection*{Fichier \texttt{frontend/.env}}
+
+\begin{lstlisting}[caption={frontend/.env}]
+# URL du backend FastAPI
+NEXT_PUBLIC_BACKEND_ENDPOINT=http://localhost:8000
+\end{lstlisting}
+
+Modifier l'URL selon l'environnement de déploiement (Cloud Run, serveur distant...).
+
+% ════════════════════════════════════════════════════════════════════════════
+\section{Démarrage avec Docker Compose}
+
+\begin{lstlisting}[caption={Deploiement avec Docker Compose}]
+# 1. Renseigner les variables d'environnement dans backend/.env
+#    (OPENROUTER_API_KEY et ON_PREMISE_BASE_URL au minimum)
+
+# 2. Construire et demarrer
+cd backend
+docker compose up --build
+\end{lstlisting}
+
+Le backend est accessible sur le port \textbf{8000}, le frontend sur le port \textbf{3000}.
+
+\begin{mdframed}[backgroundcolor=LightBlue]
+\textbf{Persistance des données :} les résultats de benchmarking sont stockés dans 
+
+\texttt{backend/data/test\_results.db}. Ce dossier est monté comme volume Docker --- ne pas le supprimer entre les redémarrages.
+\end{mdframed}
+
+% ════════════════════════════════════════════════════════════════════════════
+\section{Utilisation}
+
+\subsection*{Workflow Analyse — analyser un projet C++}
+
+\begin{enumerate}
+  \item Ouvrir \url{http://localhost:3000}
+  \item Cliquer sur \textbf{Select Project Folder} et sélectionner le dossier du projet C++
+  \item Argus parse automatiquement le \texttt{CMakeLists.txt}, construit le graphe d'appels et interroge la NVD
+  \item Le graphe s'affiche : les nœuds sont colorés selon le risque (vert $\rightarrow$ rouge selon le score 0--10)
+  \item Cliquer sur \textbf{Generate Global AI Report} pour lancer l'analyse on-premise complète
+  \item Cliquer sur un nœud pour afficher ses CVEs et générer un rapport détaillé (\textbf{Analyze with AI})
+\end{enumerate}
+
+\begin{mdframed}[backgroundcolor=LightBlue]
+\textbf{Rappel confidentialité :} dans ce workflow, le code source n'est jamais envoyé au cloud. Seuls des noms de fonctions et des descriptions CVE peuvent transiter vers OpenRouter pour la résolution de bibliothèques et l'enrichissement contextuel.
+\end{mdframed}
+
+\subsection*{Workflow Benchmarking — évaluer un modèle}
+
+\begin{enumerate}
+  \item Naviguer vers \texttt{/tests} via l'icône de navigation
+  \item Cliquer sur \textbf{+ New}
+  \item Sélectionner le projet, le \textbf{modèle testé} (on-premise) et les \textbf{modèles juges}
+  \item Cliquer sur \textbf{Launch Test} — le test s'exécute en arrière-plan
+\end{enumerate}
+
+Le résultat affiche les scores globaux, les métriques qualité par nœud, et le rapport de consensus.
+
+\begin{mdframed}[backgroundcolor=LightYellow]
+\textbf{Note :} dans ce workflow, le code source est transmis aux juges cloud pour qu'ils puissent évaluer l'analyse. Réserver ce mode à l'évaluation de modèles sur des projets non confidentiels.
+\end{mdframed}
+
+% ════════════════════════════════════════════════════════════════════════════
+\section{Diagnostics courants}
+
+\begin{table}[H]
+  \centering
+  \begin{tabularx}{\textwidth}{l X}
+    \toprule
+    \textbf{Symptôme} & \textbf{Cause probable et solution} \\
+    \midrule
+    Timeout sur les requêtes LLM & \texttt{ON\_PREMISE\_BASE\_URL} incorrect ou serveur Ollama inaccessible \\
+    Score = 0.0 sur tous les nœuds & Modèle non disponible sur le serveur Ollama (vérifier avec \texttt{DEBUG\_AI=1}) \\
+    Aucune CVE trouvée & Bibliothèque non reconnue ou rate limit NVD atteint (ajouter \texttt{NVD\_API\_KEY}) \\
+    ``[object Object]'' dans le rapport & Modèle retourne du JSON malformé --- passer à \texttt{DEBUG\_AI=1} pour inspecter la réponse brute \\
+    Modèle absent du sélecteur de tests & Le modèle n'est pas dans le catalogue OpenRouter --- le modèle on-premise est injecté automatiquement au démarrage \\
+    \bottomrule
+  \end{tabularx}
+  \caption{Diagnostics courants}
+\end{table}
+
+\end{document}

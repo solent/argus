@@ -1,0 +1,178 @@
+\documentclass[a4paper, 12pt, hidelinks]{article}
+\usepackage{bookmark}
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage{lmodern}
+\usepackage{graphicx}
+\usepackage[french]{babel}
+\usepackage{geometry}
+\usepackage{caption}
+\usepackage{float}
+\usepackage{url}
+\usepackage{color}
+\usepackage{hyperref}
+\usepackage{setspace}
+\usepackage{fancyhdr}
+\usepackage{mdframed}
+\usepackage{libertine}
+\usepackage{tabularx}
+\usepackage{listings}
+\usepackage{booktabs}
+\pagestyle{fancy}
+\setlength{\marginparwidth}{10pt}
+\setlength{\textwidth}{550pt}
+\setlength{\headheight}{26pt}
+\renewcommand{\headrulewidth}{1pt}
+\fancyhead[C]{}
+\fancyhead[L]{\includegraphics[width = 0.07\textwidth]{entete.png}}
+\fancyhead[R]{\textbf{Argus -- Historique de développement}}
+\renewcommand{\footrulewidth}{1pt}
+\fancyfoot[L]{\textbf{page \thepage}}
+\fancyfoot[C]{}
+\fancyfoot[R]{SCHOBERT Néo}
+\renewcommand{\thesection}{\Roman{section}}
+\definecolor{CornflowerBlue}{rgb}{0.392,0.584,0.929}
+\definecolor{LightBlue}{RGB}{230, 242, 249}
+\geometry{hmargin=2.5cm,vmargin=2cm}
+\setstretch{1.15}
+\setlength{\parindent}{0cm}
+\setlength{\parskip}{1ex plus 0.5ex minus 0.2ex}
+\newcommand{\HRule}{\rule{\linewidth}{0.5mm}}
+
+\begin{document}
+
+\begin{titlepage}
+  \begin{sffamily}
+  \begin{center}
+    \includegraphics[scale=1]{entete.png}~\\[1.5cm]
+    \textsc{\LARGE IMT Atlantique}\\[2cm]
+    \textsc{\Large Projet Procom}\\[1.5cm]
+    \HRule \\[0.4cm]
+    { \huge \bfseries Argus\\[0.2cm] }
+    { \Large \bfseries Historique du développement\\[0.4cm] }
+    \HRule \\[2cm]
+    \begin{minipage}{0.4\textwidth}
+      \begin{flushleft} \large
+        SCHOBERT Néo\\
+        EL AKRABA Othmane\\
+        AYOUBI Houcine\\
+        TRAORE Idrissa\\
+      \end{flushleft}
+    \end{minipage}
+    \begin{minipage}{0.4\textwidth}
+      \begin{flushright} \large
+        \textbf{Argus -- Debug Story}
+      \end{flushright}
+    \end{minipage}
+    \vfill
+  \end{center}
+  \end{sffamily}
+\end{titlepage}
+
+\tableofcontents
+\newpage
+
+% ════════════════════════════════════════════════════════════════════════════
+\section{Genèse et motivations}
+
+Les outils classiques de gestion de vulnérabilités (Dependabot, Snyk...) signalent une CVE dès qu'une bibliothèque est dans une plage de versions affectées. Ils ne tiennent pas compte du contexte réel d'utilisation dans le code source : la fonctionnalité vulnérable est-elle réellement appelée ? Les données contrôlées par l'attaquant atteignent-elles le sink vulnérable ? Des mitigations sont-elles en place ?
+
+L'idée d'Argus est de répondre à cette question grâce à l'IA, tout en respectant une contrainte forte : en contexte entreprise, le code source ne doit pas quitter le serveur local. Toute l'architecture du projet découle de cette contrainte.
+
+% ════════════════════════════════════════════════════════════════════════════
+\section{Construction du graphe d'appels et premières frictions}
+
+La première brique fut la construction d'un graphe d'appels à partir du code source C++. tree-sitter a été retenu pour sa légèreté et son intégration Python, avec un parsing en deux passes : extraction des définitions de fonctions, puis extraction des appels dans chaque définition.
+
+\subsection*{Problème : mauvaise attribution des fonctions à leurs bibliothèques}
+
+Lors des premiers tests avec le client, un problème fondamental est apparu : les CVEs remontées pour une fonction appartenaient parfois à la mauvaise bibliothèque. Par exemple, une fonction comme \texttt{send()} peut appartenir à la libc, à une bibliothèque réseau tierce, ou encore à une bibliothèque applicative — le parsing CMake seul ne suffit pas toujours à trancher.
+
+\textit{Solution} : ajout d'un \textbf{fallback LLM cloud} pour la résolution des symboles. Lorsque l'attribution automatique est ambiguë, un modèle cloud reçoit la liste des appels et des bibliothèques liées (CMake) — sans aucun code source — et retourne la bibliothèque la plus probable avec un score de confiance. Cela s'est révélé fiable sur les bibliothèques courantes (libcurl, OpenSSL, zlib, boost...).
+
+\subsection*{Problème : versions affectées absentes de la NVD}
+
+En interrogeant l'API NVD pour récupérer les CVEs, on s'est rendu compte que certaines fiches ne listent pas explicitement les versions affectées. Sans cette information, impossible de savoir si la version utilisée dans le projet est réellement concernée.
+
+\textit{Solution} : ajout d'un second \textbf{fallback LLM cloud} : à partir de la description textuelle de la CVE, le modèle infère les plages de versions probablement affectées. Ici encore, aucun code source n'est transmis — seulement la description NVD de la vulnérabilité.
+
+% ════════════════════════════════════════════════════════════════════════════
+\section{Du code complet au BackSlicer}
+
+\subsection*{Première approche : analyse du code complet}
+
+L'idée initiale était simple : envoyer l'intégralité du code source au modèle on-premise pour qu'il juge de l'exploitabilité. En pratique, cette approche s'est heurtée à une limite immédiate : sur des projets réels, le code dépasse très largement la fenêtre de contexte des modèles on-premise (typiquement 8k à 32k tokens). Même avec de petits projets, l'ensemble des fichiers sources avec leurs includes représente bien plus que ce qu'un modèle embarqué peut traiter.
+
+\subsection*{Le BackSlicer : extraire uniquement le contexte pertinent}
+
+L'idée du backward slicing est de n'envoyer au modèle que les lignes de code qui \textit{influencent directement} les arguments de l'appel vulnérable, en remontant le flux de données depuis ce point. Le slicer fonctionne en 4 passes :
+
+\begin{enumerate}
+  \item \textbf{Passe 1} : chaînes d'assignation (\texttt{a = b; b = recv(...)})
+  \item \textbf{Passe 2} : sinks de sécurité (\texttt{memcpy}, \texttt{strcpy}, \texttt{malloc}...)
+  \item \textbf{Passe 3} : accès membres et indexation de tableaux sur les objets suivis
+  \item \textbf{Passe 4} : déclarations de taille (\texttt{sizeof}, \texttt{strlen}, constantes)
+\end{enumerate}
+
+Le BackSlicer actuel est basé sur des heuristiques regex. Il est encore perfectible : les templates C++, les macros complexes et les appels via pointeurs de fonctions ne sont pas toujours correctement suivis. La solution idéale serait un slicer basé sur l'\textbf{AST Clang} (via \texttt{libclang}), qui produirait un vrai graphe de dépendances de données (PDG/SDG) avec une précision structurelle. Cette approche n'a cependant pas été retenue : elle impose de fournir l'ensemble des en-têtes système et des dépendances au moment de la compilation, une contrainte lourde à automatiser dans un outil générique. Le slicer heuristique constitue un compromis pragmatique --- aucune configuration de l'environnement de compilation n'est requise, au prix d'une couverture incomplète sur le C++ avancé.
+
+\subsection*{Rapports récursifs + rapport global}
+
+Le pipeline d'analyse a été structuré en deux niveaux. Le modèle on-premise génère d'abord un \textbf{rapport local} pour chaque nœud du graphe d'appels (chaque fonction potentiellement vulnérable), puis un \textbf{rapport global} qui compile l'ensemble des rapports locaux pour fournir une vue synthétique du risque projet.
+
+% ════════════════════════════════════════════════════════════════════════════
+\section{Adaptation aux modèles on-premise}
+
+\subsection*{Le problème des faux négatifs}
+
+Le pipeline fonctionnait bien sur les grands modèles cloud (GPT-4, Claude...). Sur les modèles on-premise (24B paramètres), deux problèmes sont apparus :
+
+\begin{itemize}
+  \item La fenêtre de contexte, même avec le BackSlicer, restait parfois insuffisante pour établir un verdict clair
+  \item Quand le modèle n'était pas sûr, il avait tendance à assigner un score de 0.0 par prudence
+\end{itemize}
+
+En sécurité, un faux négatif (CVE exploitable non détectée) est bien plus grave qu'un faux positif (alerte sur un code en réalité sûr). Les prompts ont été refondus avec cette philosophie explicite : il vaut mieux sur-alerter que sous-alerter. Des plages de scores obligatoires ont été introduites par verdict (\texttt{INSUFFICIENT\_INFO} ne peut jamais produire un score de 0.0).
+
+\subsection*{Enrichissement CVE par LLM cloud}
+
+Pour compenser le manque de contexte du petit modèle, une étape d'enrichissement a été ajoutée avant l'analyse on-premise : un LLM cloud reçoit la description de la CVE et génère du contexte sémantique supplémentaire — exemples de mauvaise utilisation, pattern de code vulnérable canonique, prérequis d'exploitation, etc.
+
+Ce contexte enrichi est injecté dans le prompt du modèle on-premise. L'\textbf{idée clé} : seule la description NVD est transmise au LLM cloud, jamais le code source — ce qui reste compatible avec la contrainte de confidentialité.
+
+% ════════════════════════════════════════════════════════════════════════════
+\section{Le workflow de benchmarking}
+
+\subsection*{Besoin d'évaluation objective}
+
+Pour prouver que la solution fonctionne et en mesurer les limites, il fallait un moyen d'évaluer objectivement la qualité des rapports produits par le modèle on-premise. L'idée adoptée : utiliser des \textbf{modèles juges cloud} (DeepSeek, Gemini...) qui analysent le même code et notent la qualité de l'analyse produite par le modèle on-premise.
+
+\subsection*{Problème : divergence entre juges}
+
+Après mise en place du workflow, on s'est rendu compte que deux juges cloud ne donnaient pas systématiquement les mêmes scores sur un même rapport. La variance entre juges rendait la comparaison peu fiable.
+
+\textit{Solution} : mise en place d'un protocole de \textbf{consensus en 3 phases} : analyse indépendante, révision croisée avec justification technique obligatoire, puis synthèse par médiane pondérée. Le juge le plus proche de la médiane rédige le rapport final.
+
+\subsection*{Contrainte de coût}
+
+Le benchmarking a un coût direct en tokens OpenRouter. Pour un projet modeste de 3--4 fichiers, un test complet (modèle testé + 2 juges × 3 phases) revient à environ \textbf{25 centimes}. Ce coût a limité le nombre de tests réalisables : seuls 12 tests ont été effectués sur 2 projets. Un échantillon plus large permettrait des conclusions statistiquement plus robustes.
+
+% ════════════════════════════════════════════════════════════════════════════
+\section{Interface utilisateur et architecture finale}
+
+\subsection*{Design du frontend}
+
+Le frontend Next.js a été conçu avec un design sobre (palette navy foncé, accents bleus) autour du graphe d'appels interactif (vis-network). Les données transitent en deux appels distincts :
+
+\begin{enumerate}
+  \item \textbf{Premier appel} (\texttt{/analyze}) : parsing du projet, construction du graphe d'appels, récupération des CVEs — retourne toutes les données structurées au frontend, sans appel IA
+  \item \textbf{Second appel} (\texttt{/llm\_generate\_report}) : génération des rapports IA sur les nœuds sélectionnés — seul ce second appel déclenche des requêtes vers le modèle on-premise
+\end{enumerate}
+
+Rien n'est stocké côté serveur pour le workflow d'analyse (les données restent en mémoire le temps de la session). Seuls les résultats des tests de benchmarking sont persistés en base SQLite. Ce choix évite toute double analyse et garantit qu'aucune donnée de code ne s'accumule en dehors du contexte d'exécution.
+
+\subsection*{Pistes d'amélioration des prompts}
+
+Un prompt d'analyse local représente actuellement 3\,000 à 4\,000 tokens, ce qui convient pour les modèles on-premise disposant d'une fenêtre de 32k tokens. Une piste d'amélioration serait la \textbf{décomposition en sous-prompts} : plutôt qu'un seul prompt dense, enchaîner plusieurs questions ciblées (version affectée ? flux de données ? guard contournable ?). Cette approche réduirait le risque d'hallucination et forcerait un raisonnement étape par étape, au prix d'une latence légèrement accrue.
+
+\end{document}

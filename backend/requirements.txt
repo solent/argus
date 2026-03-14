@@ -1,0 +1,10 @@
+fastapi
+uvicorn[standard]
+python-multipart
+tree_sitter
+tree_sitter_cpp
+pandas
+requests
+packaging
+pydantic
+databases[sqlite]

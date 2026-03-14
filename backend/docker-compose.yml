@@ -1,0 +1,25 @@
+version: "3.9"
+
+services:
+  backend:
+    build: .
+    ports:
+      - "8000:8000"
+    environment:
+      # Required — cloud API for library resolution, CVE context enrichment, judge models
+      - OPENROUTER_API_KEY=${OPENROUTER_API_KEY}
+
+      # Optional — increases NVD rate limit (120 req/min vs 10 req/min)
+      - NVD_API_KEY=${NVD_API_KEY:-}
+
+      # On-premise model — Solent Ollama server (OpenVPN required)
+      # http://ollama.llm.solent.fr/v1  — no auth key needed
+      - ON_PREMISE_BASE_URL=${ON_PREMISE_BASE_URL:-http://ollama.llm.solent.fr/v1}
+      - ON_PREMISE_MODEL=${ON_PREMISE_MODEL:-devstral:24b}
+      - ON_PREMISE_API_KEY=${ON_PREMISE_API_KEY:-}
+
+      # Set DEBUG_AI=1 to log every LLM prompt and raw response to stdout
+      - DEBUG_AI=${DEBUG_AI:-0}
+
+    volumes:
+      - ./data:/data

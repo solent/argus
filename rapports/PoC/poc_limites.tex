@@ -1,0 +1,264 @@
+\documentclass[a4paper, 12pt, hidelinks]{article}
+\usepackage{bookmark}
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage{lmodern}
+\usepackage{graphicx}
+\usepackage[french]{babel}
+\usepackage{geometry}
+\usepackage{caption}
+\usepackage{float}
+\usepackage{url}
+\usepackage{color}
+\usepackage{hyperref}
+\usepackage{setspace}
+\usepackage{fancyhdr}
+\usepackage{mdframed}
+\usepackage{libertine}
+\usepackage{tabularx}
+\usepackage{listings}
+\usepackage{amsmath}
+\usepackage{booktabs}
+\usepackage{colortbl}
+\usepackage{multirow}
+\pagestyle{fancy}
+\setlength{\marginparwidth}{10pt}
+\setlength{\textwidth}{550pt}
+\setlength{\headheight}{26pt}
+\renewcommand{\headrulewidth}{1pt}
+\fancyhead[C]{}
+\fancyhead[L]{\includegraphics[width = 0.07\textwidth]{entete.png}}
+\fancyhead[R]{\textbf{Argus -- Preuve de Concept et Limites}}
+\renewcommand{\footrulewidth}{1pt}
+\fancyfoot[L]{\textbf{page \thepage}}
+\fancyfoot[C]{}
+\fancyfoot[R]{SCHOBERT Néo}
+\renewcommand{\thesection}{\Roman{section}}
+\definecolor{CornflowerBlue}{rgb}{0.392,0.584,0.929}
+\definecolor{LightBlue}{RGB}{230, 242, 249}
+\geometry{hmargin=2.5cm,vmargin=2cm}
+\setstretch{1.15}
+\setlength{\parindent}{0cm}
+\setlength{\parskip}{1ex plus 0.5ex minus 0.2ex}
+\newcommand{\HRule}{\rule{\linewidth}{0.5mm}}
+
+\begin{document}
+
+\begin{titlepage}
+  \begin{sffamily}
+  \begin{center}
+    \includegraphics[scale=1]{entete.png}~\\[1.5cm]
+    \textsc{\LARGE IMT Atlantique}\\[2cm]
+    \textsc{\Large Projet Procom}\\[1.5cm]
+    \HRule \\[0.4cm]
+    { \huge \bfseries Argus\\[0.2cm] }
+    { \Large \bfseries Preuve de concept et limites\\[0.4cm] }
+    \HRule \\[2cm]
+    \begin{minipage}{0.4\textwidth}
+      \begin{flushleft} \large
+        SCHOBERT Néo\\
+        EL AKRABA Othmane\\
+        AYOUBI Houcine\\
+        TRAORE Idrissa\\
+      \end{flushleft}
+    \end{minipage}
+    \begin{minipage}{0.4\textwidth}
+      \begin{flushright} \large
+        \textbf{Argus -- PoC \& Limites}
+      \end{flushright}
+    \end{minipage}
+    \vfill
+  \end{center}
+  \end{sffamily}
+\end{titlepage}
+
+\tableofcontents
+\newpage
+
+% ════════════════════════════════════════════════════════════════════════════
+\section{Protocole de benchmarking}
+
+\subsection*{Rappel du workflow de benchmarking}
+
+Le workflow de benchmarking d'Argus évalue la qualité d'un modèle on-premise en le faisant noter par des juges cloud. Le modèle testé analyse le projet C++ localement, puis les juges reçoivent le code et les rapports pour évaluer leur qualité en 3 phases : analyse indépendante, révision croisée, et consensus (médiane pondérée).
+
+\subsection*{Échelle de scores et critères d'évaluation}
+
+\textbf{Score de vulnérabilité (0--10).} Chaque nœud du graphe d'appels reçoit un score global entre 0 et 10, correspondant à un verdict d'exploitabilité :
+
+\begin{table}[H]
+  \centering
+  \begin{tabularx}{\textwidth}{l c X}
+    \toprule
+    \textbf{Verdict} & \textbf{Plage obligatoire} & \textbf{Conditions} \\
+    \midrule
+    \texttt{EXPLOITABLE}              & 7.0 -- 10.0 & Entrée attaquant confirmée atteignant le sink, aucun garde efficace \\
+    \texttt{LIKELY\_EXPLOITABLE}      & 5.0 -- 8.0  & Probable, comportement par défaut vulnérable, ou aucune mitigation visible \\
+    \texttt{CONDITIONALLY\_EXPLOIT.}  & 3.0 -- 6.0  & Nécessite des options de build ou conditions d'exécution spécifiques \\
+    \texttt{INSUFFICIENT\_INFO}       & 3.0 -- 5.0  & Impossible de trancher --- inconnu $\neq$ sûr, jamais 0.0 \\
+    \texttt{NOT\_EXPLOITABLE}         & 0.0 -- 2.0  & Uniquement si une mitigation explicite, efficace et non contournable est présente \\
+    \bottomrule
+  \end{tabularx}
+  \caption{Verdicts et plages de scores obligatoires}
+\end{table}
+
+\textbf{Métriques qualité (0.0--1.0 par critère).} Chaque juge évalue également la qualité du rapport produit par le modèle testé selon 12 critères locaux (par nœud) et 10 critères globaux. Les principaux critères locaux sont :
+
+\begin{itemize}
+  \item \textbf{taint\_analysis\_quality} : la chaîne source $\rightarrow$ sink est-elle tracée avec les noms de variables ?
+  \item \textbf{cve\_version\_matching} : la version affectée est-elle explicitement vérifiée ?
+  \item \textbf{exploit\_completeness} : toutes les CVEs exploitables ont-elles été détectées ?
+  \item \textbf{speculation\_control} : le rapport évite-t-il les chemins d'attaque inventés ?
+  \item \textbf{technical\_clarity} : des numéros de ligne et noms de variables sont-ils cités ?
+\end{itemize}
+
+Les critères globaux ajoutent : \textbf{exploit\_chain\_detection} (chaîne A $\rightarrow$ B détectée via la topologie du graphe), \textbf{critical\_node\_identification} (classement des nœuds les plus dangereux), et \textbf{call\_graph\_exploitation} (utilisation effective de la structure d'appels).
+
+\textbf{Consensus (phase 3).} La médiane pondérée des scores révisés (phase 2) détermine le score final. Le poids de chaque juge est $1.0 + 0.5 \times \min(n_{\text{consensus}}, 4)$, où $n_{\text{consensus}}$ est le nombre de constats partagés avec les pairs. Le score global ne peut dépasser le maximum des scores locaux que si une chaîne d'exploitation est confirmée par au moins deux juges.
+
+\subsection*{Projets de test}
+
+\begin{itemize}
+  \item \textbf{MyProject} : projet C++ minimal utilisant la bibliothèque \texttt{cpr} (wrapper C++ de libcurl) et libcurl 7.18.0 directement. Contient des appels à \texttt{cpr::Get} ainsi qu'aux fonctions de l'API curl bas niveau.
+  \item \textbf{VulnerableCurlExample} : projet utilisant libcurl 7.18.0 (version délibérément ancienne), avec 9 points d'appel distincts. Les deux CVEs associées sont CVE-2009-0037 (suivi de redirections vers des ressources locales, CVSS 6.8) et CVE-2009-2417 (null byte injection dans les certificats SSL, CVSS 6.8).
+\end{itemize}
+
+\subsection*{Modèles et juges}
+
+Trois modèles on-premise ont été évalués :
+\texttt{devstral:24b} (Mistral AI, spécialisé code), \texttt{gpt-oss:20b} et \texttt{qwen3:32b}.
+
+Deux juges cloud ont servi de référence : \textbf{DeepSeek Chat} et \textbf{Gemini 2.5 Flash}.
+
+% ════════════════════════════════════════════════════════════════════════════
+\section{Résultats complets}
+
+Au total, \textbf{12 tests} ont été réalisés et enregistrés en base de données.
+
+\begin{table}[H]
+  \centering
+  \small
+  \begin{tabular}{l l c c c c}
+    \toprule
+    \textbf{Modèle} & \textbf{Projet} & \textbf{Score} & \textbf{DeepSeek} & \textbf{Gemini} & \textbf{Consensus} \\
+    \midrule
+    \multirow{4}{*}{\texttt{devstral:24b}}
+      & MyProject (vulnérable)        & 8.5 & 7.0 & 7.0 & 7.0 \\
+      & VulnerableCurlExample (run 1) & 7.0 & 8.0 & 8.0 & 8.0 \\
+      & VulnerableCurlExample (run 2) & 7.0 & 8.5 & 8.5 & 8.5 \\
+      & MyProject (non vulnérable)    & 0.0 & 0.0 & 0.0 & 0.0 \\
+    \midrule
+    \multirow{4}{*}{\texttt{gpt-oss:20b}}
+      & MyProject (vulnérable)        & 5.5 & 9.0 & 9.0 & 9.0 \\
+      & VulnerableCurlExample (run 1) & 6.0 & 8.5 & 8.5 & 8.5 \\
+      & VulnerableCurlExample (run 2) & 8.0 & 9.0 & 9.0 & 9.0 \\
+      & MyProject (non vulnérable)    & 0.0 & 0.0 & 0.0 & 0.0 \\
+    \midrule
+    \multirow{4}{*}{\texttt{qwen3:32b}}
+      & MyProject (vulnérable)        & 7.5 & 7.5 & 8.5 & 8.0 \\
+      & VulnerableCurlExample (run 1) & 7.5 & 9.0 & 9.0 & 9.0 \\
+      & VulnerableCurlExample (run 2) & 7.5 & 8.0 & 9.0 & 8.5 \\
+      & MyProject (non vulnérable)    & 0.0 & 0.0 & 0.0 & 0.0 \\
+    \bottomrule
+  \end{tabular}
+  \caption{Résultats des 12 tests. \textit{Score} = score global du modèle testé. \textit{DeepSeek} et \textit{Gemini} = scores révisés après révision croisée. \textit{MyProject (non vulnérable)} : version sans CVE — score 0.0 attendu et correct.}
+\end{table}
+
+\subsection*{Synthèse — tests valides uniquement}
+
+En excluant les 3 tests à score nul (voir §III), voici les moyennes sur les 9 tests exploitables :
+
+\begin{table}[H]
+  \centering
+  \begin{tabularx}{\textwidth}{l c c c}
+    \toprule
+    \textbf{Modèle} & \textbf{Score moyen (testé)} & \textbf{Score consensus moyen} & \textbf{Correction} \\
+    \midrule
+    \texttt{devstral:24b} & 7.5  & 7.8 & +0.3 \\
+    \texttt{gpt-oss:20b}  & 6.5  & 8.8 & +2.3 \\
+    \texttt{qwen3:32b}    & 7.5  & 8.5 & +1.0 \\
+    \bottomrule
+  \end{tabularx}
+  \caption{Synthèse sur VulnerableCurlExample + MyProject (tests valides). La correction représente l'écart entre le score du modèle testé et le consensus des juges.}
+\end{table}
+
+Le mécanisme de consensus corrige systématiquement les sous-évaluations, avec une correction particulièrement marquée pour \texttt{gpt-oss:20b} (+2.3 points).
+
+Sur \textbf{VulnerableCurlExample} uniquement (projet avec CVEs certaines) :
+\begin{itemize}
+  \item \texttt{devstral:24b} : 7.0 / 7.0 $\rightarrow$ consensus 8.0 / 8.5 (correction +1.25 en moyenne)
+  \item \texttt{gpt-oss:20b} : 6.0 / 8.0 $\rightarrow$ consensus 8.5 / 9.0 (correction +1.75 en moyenne)
+  \item \texttt{qwen3:32b} : 7.5 / 7.5 $\rightarrow$ consensus 9.0 / 8.5 (correction +1.25 en moyenne)
+\end{itemize}
+
+% ════════════════════════════════════════════════════════════════════════════
+\section{Analyse des résultats}
+
+\subsection*{Scores nuls : projet sans CVE}
+
+Les trois tests à score 0.0 (un par modèle) correspondent à une version de MyProject \textbf{sans CVE connue} — aucune bibliothèque avec une vulnérabilité référencée n'est utilisée dans cette configuration. Le score 0.0 est donc le résultat correct et attendu : il n'y a rien à détecter. Juges et modèle testé s'accordent unanimement sur ce verdict, ce qui illustre également la bonne calibration du système sur les projets sains.
+
+\subsection*{Variance inter-runs}
+
+Sur VulnerableCurlExample, \texttt{gpt-oss:20b} présente une variance significative entre ses deux runs (6.0 vs 8.0), indiquant une instabilité du modèle sur ce type de tâche. \texttt{devstral:24b} et \texttt{qwen3:32b} sont plus stables (7.0/7.0 et 7.5/7.5).
+
+% ════════════════════════════════════════════════════════════════════════════
+\section{Limites identifiées}
+
+\begin{itemize}
+  \item \textbf{Analyse par points d'appel} : Argus ne voit que les appels visibles dans le code. Une CVE déclenchée par la simple liaison avec une bibliothèque, via un callback implicite, ou dans le code d'initialisation statique ne sera pas détectée.
+  \item \textbf{BackSlicer heuristique} : les templates C++ complexes, macros préprocesseur et appels via pointeurs de fonctions peuvent ne pas être correctement suivis.
+  \item \textbf{CMake uniquement} : les projets sans CMakeLists.txt (Makefile, Bazel, Meson...) ne sont pas supportés.
+  \item \textbf{Analyse probabiliste} : deux exécutions identiques peuvent produire des scores différents. La variance observée est de 0 point pour devstral et qwen3 sur VulnerableCurlExample, mais de 2 points pour gpt-oss.
+  \item \textbf{Corpus limité} : 12 tests sur 2 projets ne suffisent pas pour des conclusions statistiquement robustes. Un corpus plus large (projets diversifiés, CVEs de différentes natures, code non vulnérable) serait nécessaire.
+  \item \textbf{Tests séquentiels} : l'état partagé dans les \texttt{ClassVar} de \texttt{CallGraphNode} empêche l'exécution parallèle des tests de benchmarking.
+\end{itemize}
+
+% ════════════════════════════════════════════════════════════════════════════
+\section{Pistes d'amélioration}
+
+\subsection*{Améliorer le BackSlicer}
+
+Le BackSlicer actuel repose sur des heuristiques regex pour remonter les flux de données. Cette approche atteint ses limites sur le C++ moderne : templates, lambdas, pointeurs de fonctions, et macros complexes ne sont pas toujours correctement suivis.
+
+La solution idéale serait un \textbf{slicer basé sur l'AST Clang} (via \texttt{libclang} ou l'API C++ de Clang), qui produirait un vrai graphe de dépendances de données (PDG/SDG) permettant de suivre les flux avec une précision structurelle plutôt que textuelle. Cette approche n'a pas été retenue car elle impose de fournir l'ensemble des en-têtes système et des dépendances au moment de la compilation --- une contrainte lourde à automatiser dans un outil générique. Le slicer heuristique actuel constitue un compromis pragmatique : il ne nécessite aucune configuration de l'environnement de compilation, au prix d'une couverture incomplète sur le C++ avancé.
+
+\subsection*{Améliorer les prompts et le contexte fourni aux LLMs}
+
+Les modèles on-premise de taille modeste (24B paramètres) bénéficient fortement d'un contexte riche et structuré. Plusieurs axes d'amélioration sont envisageables :
+
+\begin{itemize}
+  \item \textbf{Fournir le pattern canonique de la CVE} : inclure dans le prompt un exemple de code vulnérable et un exemple de code corrigé, extraits de la base CWE. Le modèle peut alors comparer directement le code analysé au pattern de référence.
+  \item \textbf{Injecter les exploits publics (ExploitDB)} : pour les CVEs avec un exploit référencé, fournir un extrait de l'exploit comme contexte. Le modèle comprend mieux le vecteur d'attaque concret.
+  \item \textbf{Fournir la topologie du graphe d'appels} dans le prompt global, pour permettre la détection de chaînes d'exploitation (vulnérabilité A qui facilite l'exploitation de vulnérabilité B).
+  \item \textbf{Enrichissement CWE via cloud} : avant l'analyse on-premise, appeler un LLM cloud pour classifier la CVE par CWE et générer le contexte sémantique. Le code source ne transitant pas dans cet appel, cela reste compatible avec les contraintes de confidentialité.
+\end{itemize}
+
+\subsection*{Élargir le corpus de test}
+
+12 tests sur 2 projets est insuffisant pour des conclusions robustes. Un corpus plus représentatif inclurait :
+\begin{itemize}
+  \item Des projets avec des bibliothèques diversifiées (OpenSSL, zlib, libpng, SQLite...)
+  \item Des CVEs de différentes natures (buffer overflow, integer overflow, use-after-free, format string...)
+  \item Des projets avec des mitigations partielles (certains appels sécurisés, d'autres non)
+  \item Des projets sans CVE comme base de mesure du taux de faux positifs
+\end{itemize}
+
+\subsection*{Autres améliorations}
+
+\begin{itemize}
+  \item Support de systèmes de build alternatifs (Makefile, Bazel, Meson) pour élargir la couverture
+  \item Refactoring de \texttt{CallGraphNode} pour permettre l'exécution parallèle des tests
+  \item Calibration fine des plages de scores par type de CVE (les vulnérabilités de configuration ont un profil d'exploitabilité différent des buffer overflows)
+\end{itemize}
+
+% ════════════════════════════════════════════════════════════════════════════
+\section{Conclusion}
+
+Argus démontre la faisabilité d'une approche hybride statique + IA pour qualifier l'exploitabilité des CVEs, avec une contrainte forte de confidentialité du code source grâce au workflow on-premise.
+
+\textbf{devstral:24b} est le modèle le plus stable des trois testés (variance nulle sur VulnerableCurlExample, scores alignés avec le consensus des juges). \textbf{gpt-oss:20b} présente la correction la plus forte par le consensus (+2.3 points), signe d'une sous-évaluation systématique. \textbf{qwen3:32b} est intermédiaire.
+
+Le mécanisme de consensus en 3 phases apporte une valeur mesurable (+1.25 à +1.75 points sur les projets vulnérables) et la détection correcte des projets sains (score 0.0 unanime) valide la calibration basse du système.
+
+\end{document}
