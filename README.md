@@ -141,19 +141,19 @@ Les résultats de benchmarking sont persistés dans `backend/data/test_results.d
 
 Argus utilise deux catégories de modèles :
 
-| Rôle | Hébergement | Usage |
-|------|-------------|-------|
-| **Modèle on-premise** | Votre serveur Ollama | Analyse du code source — ne quitte jamais le serveur local |
-| **Modèles cloud** | OpenRouter | Résolution de bibliothèques, enrichissement CVE, juges de benchmarking |
+| Rôle                  | Hébergement          | Usage                                                                  |
+| --------------------- | -------------------- | ---------------------------------------------------------------------- |
+| **Modèle on-premise** | Votre serveur Ollama | Analyse du code source — ne quitte jamais le serveur local             |
+| **Modèles cloud**     | OpenRouter           | Résolution de bibliothèques, enrichissement CVE, juges de benchmarking |
 
 ### Modèles on-premise compatibles
 
-| Modèle | Qualité | Remarque |
-|--------|---------|----------|
-| `devstral:24b` | **Recommandé** | Spécialisé code, meilleur alignement avec les juges |
-| `qwen3:32b` | Bon | Solide en raisonnement général + code |
-| `gpt-oss:20b` | Déconseillé | Variance élevée entre exécutions, sous-évalue systématiquement |
-| Autres modèles 24B+ | À benchmarker | Utiliser le workflow Test pour évaluer tout nouveau modèle |
+| Modèle              | Qualité        | Remarque                                                       |
+| ------------------- | -------------- | -------------------------------------------------------------- |
+| `devstral:24b`      | **Recommandé** | Spécialisé code, meilleur alignement avec les juges            |
+| `qwen3:32b`         | Bon            | Solide en raisonnement général + code                          |
+| `gpt-oss:20b`       | Déconseillé    | Variance élevée entre exécutions, sous-évalue systématiquement |
+| Autres modèles 24B+ | À benchmarker  | Utiliser le workflow Test pour évaluer tout nouveau modèle     |
 
 Tout modèle 24B paramètres minimum exposant une API compatible OpenAI sur `/v1` peut être utilisé. En dessous de 24B, les modèles manquent les chemins de taint et peinent à produire du JSON structuré.
 
@@ -174,36 +174,36 @@ La solution idéale serait un slicer basé sur l'AST Clang (PDG/SDG), mais cette
 
 ### Scoring par consensus en 3 phases
 
-| Phase | Ce qui se passe |
-|-------|-----------------|
-| **1 — Indépendante** | Chaque juge produit son rapport sur le code + rapport du modèle testé |
+| Phase                    | Ce qui se passe                                                                                       |
+| ------------------------ | ----------------------------------------------------------------------------------------------------- |
+| **1 — Indépendante**     | Chaque juge produit son rapport sur le code + rapport du modèle testé                                 |
 | **2 — Révision croisée** | Chaque juge voit les rapports des autres et révise son score avec justification technique obligatoire |
-| **3 — Synthèse** | Médiane pondérée des scores révisés ; poids = 1.0 + 0.5 × (nombre de constats partagés, max 4) |
+| **3 — Synthèse**         | Médiane pondérée des scores révisés ; poids = 1.0 + 0.5 × (nombre de constats partagés, max 4)        |
 
 Le score global ne peut dépasser le maximum des scores locaux que si une chaîne d'exploitation A→B est confirmée par au moins deux juges.
 
 ### Échelle de scores (0–10)
 
-| Verdict | Plage | Conditions |
-|---------|-------|------------|
-| `EXPLOITABLE` | 7.0–10.0 | Entrée attaquant confirmée atteignant le sink, aucun garde efficace |
-| `LIKELY_EXPLOITABLE` | 5.0–8.0 | Probable, comportement par défaut vulnérable, ou aucune mitigation visible |
-| `CONDITIONALLY_EXPLOITABLE` | 3.0–6.0 | Nécessite des conditions d'exécution spécifiques |
-| `INSUFFICIENT_INFO` | 3.0–5.0 | Impossible de trancher — inconnu ≠ sûr, jamais 0.0 |
-| `NOT_EXPLOITABLE` | 0.0–2.0 | Uniquement si une mitigation explicite, efficace et non contournable est présente |
+| Verdict                     | Plage    | Conditions                                                                        |
+| --------------------------- | -------- | --------------------------------------------------------------------------------- |
+| `EXPLOITABLE`               | 7.0–10.0 | Entrée attaquant confirmée atteignant le sink, aucun garde efficace               |
+| `LIKELY_EXPLOITABLE`        | 5.0–8.0  | Probable, comportement par défaut vulnérable, ou aucune mitigation visible        |
+| `CONDITIONALLY_EXPLOITABLE` | 3.0–6.0  | Nécessite des conditions d'exécution spécifiques                                  |
+| `INSUFFICIENT_INFO`         | 3.0–5.0  | Impossible de trancher — inconnu ≠ sûr, jamais 0.0                                |
+| `NOT_EXPLOITABLE`           | 0.0–2.0  | Uniquement si une mitigation explicite, efficace et non contournable est présente |
 
 ---
 
 ## API
 
-| Méthode | Endpoint | Description |
-|---------|----------|-------------|
-| `POST` | `/analyze` | Parse le projet, construit le graphe d'appels (sans IA) |
-| `POST` | `/llm_generate_report` | Génère un rapport IA pour un projet ou un nœud |
-| `POST` | `/test_results` | Soumet un test de benchmarking — retourne `{ job_id }` (202) |
-| `GET` | `/jobs/{job_id}` | Suivi du job + résultat quand terminé |
-| `GET` | `/test_results` | Liste tous les tests + modèles disponibles |
-| `GET` | `/test_results/{id}` | Récupère un résultat de test |
+| Méthode | Endpoint               | Description                                                  |
+| ------- | ---------------------- | ------------------------------------------------------------ |
+| `POST`  | `/analyze`             | Parse le projet, construit le graphe d'appels (sans IA)      |
+| `POST`  | `/llm_generate_report` | Génère un rapport IA pour un projet ou un nœud               |
+| `POST`  | `/test_results`        | Soumet un test de benchmarking — retourne `{ job_id }` (202) |
+| `GET`   | `/jobs/{job_id}`       | Suivi du job + résultat quand terminé                        |
+| `GET`   | `/test_results`        | Liste tous les tests + modèles disponibles                   |
+| `GET`   | `/test_results/{id}`   | Récupère un résultat de test                                 |
 
 Documentation interactive : `http://localhost:8000/docs`
 
@@ -223,13 +223,13 @@ Critères globaux spécifiques : `exploit_chain_detection` (chaîne A→B avec t
 
 12 tests sur 3 modèles et 2 projets cibles, évalués par DeepSeek Chat et Gemini 2.5 Flash.
 
-| Modèle | Score moyen (brut) | Score consensus moyen | Correction |
-|--------|-------------------|----------------------|------------|
-| `devstral:24b` | 7.5 | 7.8 | +0.3 |
-| `qwen3:32b` | 7.5 | 8.5 | +1.0 |
-| `gpt-oss:20b` | 6.5 | 8.8 | +2.3 |
+| Modèle         | Score moyen (brut) | Score consensus moyen | Correction |
+| -------------- | ------------------ | --------------------- | ---------- |
+| `devstral:24b` | 7.5                | 7.8                   | +0.3       |
+| `qwen3:32b`    | 7.5                | 8.5                   | +1.0       |
+| `gpt-oss:20b`  | 6.5                | 8.8                   | +2.3       |
 
-*Moyennes sur les 9 tests valides (projets vulnérables). Les 3 tests à score 0.0 correspondent au projet sans CVE — résultat correct et attendu.*
+_Moyennes sur les 9 tests valides (projets vulnérables). Les 3 tests à score 0.0 correspondent au projet sans CVE — résultat correct et attendu._
 
 Le consensus corrige systématiquement les sous-évaluations (+1.25 à +1.75 points sur VulnerableCurlExample). Résultats complets dans `rapports/PoC/poc_limites.pdf`.
 
@@ -247,14 +247,18 @@ Le consensus corrige systématiquement les sous-évaluations (+1.25 à +1.75 poi
 
 ## Documentation
 
-| Document | Description |
-|----------|-------------|
-| `rapports/Doc/guide_utilisation.pdf` | Guide complet — installation, configuration, utilisation, diagnostics |
-| `rapports/DebugStory/historique_projet.pdf` | Historique du développement — décisions d'architecture et problèmes rencontrés |
-| `rapports/PoC/poc_limites.pdf` | Proof of Concept — protocole de benchmarking, résultats complets, limites et pistes d'amélioration |
+| Document                                    | Description                                                                                        |
+| ------------------------------------------- | -------------------------------------------------------------------------------------------------- |
+| `rapports/Doc/guide_utilisation.pdf`        | Guide complet — installation, configuration, utilisation, diagnostics                              |
+| `rapports/DebugStory/historique_projet.pdf` | Historique du développement — décisions d'architecture et problèmes rencontrés                     |
+| `rapports/PoC/poc_limites.pdf`              | Proof of Concept — protocole de benchmarking, résultats complets, limites et pistes d'amélioration |
 
 ---
 
 ## Auteurs
 
 SCHOBERT Néo, EL AKRABA Othmane, AYOUBI Houcine, TRAORE Idrissa — IMT Atlantique, 2024–2025.
+
+## Licence
+
+Ce projet est distribué sous licence [MIT](LICENSE).
