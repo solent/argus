@@ -235,6 +235,29 @@ Le consensus corrige systématiquement les sous-évaluations (+1.25 à +1.75 poi
 
 ---
 
+## Variables d'environnement
+
+### Backend — `backend/.env`
+
+| Variable | Description | Exemple |
+| -------- | ----------- | ------- |
+| `OPENROUTER_API_KEY` | **Obligatoire.** Clé API OpenRouter pour la résolution de bibliothèques, l'enrichissement CVE et les juges de benchmarking. | `sk-or-v1-...` |
+| `NVD_API_KEY` | Optionnel. Clé API NVD — augmente le rate limit de 10 req/min à 120 req/min. Laisser vide si absent. | `xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx` |
+| `ON_PREMISE_BASE_URL` | URL de base du serveur Ollama (compatible OpenAI `/v1`). | `http://192.168.1.10:11434/v1` |
+| `ON_PREMISE_MODEL` | Nom du modèle on-premise à utiliser pour l'analyse. | `devstral:24b` |
+| `ON_PREMISE_API_KEY` | Clé d'authentification Ollama. Laisser vide si non requise. | _(vide)_ |
+| `DEBUG_AI` | `0` : logs minimaux. `1` : affiche chaque prompt et réponse LLM dans stdout. | `0` |
+
+### Frontend — `frontend/.env`
+
+| Variable | Description | Exemple |
+| -------- | ----------- | ------- |
+| `NEXT_PUBLIC_BACKEND_ENDPOINT` | **Obligatoire.** URL du backend FastAPI accessible depuis le navigateur. En local, pointe vers `http://localhost:8000`. En production, adapter à l'adresse publique du serveur. | `http://localhost:8000` |
+
+> Le fichier `frontend/.env.example` à la racine du frontend contient un modèle prêt à copier.
+
+---
+
 ## Limitations
 
 - Argus analyse les **points d'appel visibles** — une CVE déclenchée via callback implicite ou initialisation statique ne sera pas détectée.

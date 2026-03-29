@@ -45,11 +45,14 @@ class ProjectInfos:
 
 
 
-    def find_cpp_files(self,directory: str) -> List[str]:
+    def find_cpp_files(self, directory: str) -> List[str]:
         directory = Path(directory)
         cpp_files = []
-        for pattern in ["**/*.cpp", "**/*.cc", "**/*.cxx", "**/*.c"]:
-            cpp_files.extend(str(f) for f in directory.glob(pattern))
+        # Utilisation de rglob pour parcourir récursivement tous les niveaux
+        # de sous-dossiers, y compris les headers (.h/.hpp) nécessaires à
+        # l'analyse du graphe d'appels.
+        for pattern in ["*.cpp", "*.cc", "*.cxx", "*.c", "*.h", "*.hpp"]:
+            cpp_files.extend(str(f) for f in directory.rglob(pattern))
         return sorted(cpp_files)
     
 

@@ -56,16 +56,13 @@ class CMake:
     # =====================
 
     def _find_cmake(self, project_dir: Path) -> Optional[str]:
-        candidates = [
-            project_dir / "CMakeLists.txt",
-            project_dir / "cmake" / "CMakeLists.txt"
-        ]
-        for path in candidates:
-            if path.exists():
-                return str(path)
-        for path in project_dir.rglob("CMakeLists.txt"):
-            return str(path)
-        return None
+        # Recherche récursive dans toute l'arborescence du projet.
+        # On trie les résultats par profondeur (nombre de composants du chemin)
+        # afin de préférer le CMakeLists.txt le plus haut placé — nécessaire
+        # quand le projet est structuré avec des sous-dossiers imbriqués
+        # (ex. archive extraite contenant un répertoire intermédiaire).
+        matches = sorted(project_dir.rglob("CMakeLists.txt"), key=lambda p: len(p.parts))
+        return str(matches[0]) if matches else None
 
     @staticmethod
     def _infer_vendor_from_git(git_url: str) -> Optional[str]:
