@@ -196,6 +196,49 @@ NEXT_PUBLIC_BACKEND_ENDPOINT=http://localhost:8000
 
 Modifier l'URL selon l'environnement de déploiement (Cloud Run, serveur distant...).
 
+\subsection*{Référence complète des variables d'environnement}
+
+Les tableaux suivants récapitulent l'ensemble des variables d'environnement requises ou optionnelles pour faire fonctionner Argus, avec leur description et un exemple de valeur.
+
+\textbf{Backend} (\texttt{backend/.env}) :
+
+\begin{table}[H]
+  \centering
+  \begin{tabularx}{\textwidth}{l l X l}
+    \toprule
+    \textbf{Variable} & \textbf{Obligatoire} & \textbf{Description} & \textbf{Exemple} \\
+    \midrule
+    \texttt{OPENROUTER\_API\_KEY} & \textbf{Oui} & Clé API OpenRouter — résolution de bibliothèques, enrichissement CVE, juges de benchmarking & \texttt{sk-or-v1-...} \\
+    \addlinespace
+    \texttt{NVD\_API\_KEY} & Non & Clé API NVD (NIST) — augmente le rate limit de 10 à 120 req/min. Laisser vide si absent & \texttt{xxxxxxxx-xxxx-...} \\
+    \addlinespace
+    \texttt{ON\_PREMISE\_BASE\_URL} & \textbf{Oui} & URL de base du serveur Ollama, compatible OpenAI \texttt{/v1} & \texttt{http://192.168.1.10:11434/v1} \\
+    \addlinespace
+    \texttt{ON\_PREMISE\_MODEL} & \textbf{Oui} & Nom du modèle on-premise à utiliser pour l'analyse du code source & \texttt{devstral:24b} \\
+    \addlinespace
+    \texttt{ON\_PREMISE\_API\_KEY} & Non & Clé d'authentification Ollama. Laisser vide si Ollama est sans authentification & \textit{(vide)} \\
+    \addlinespace
+    \texttt{DEBUG\_AI} & Non & \texttt{0} : logs minimaux. \texttt{1} : affiche chaque prompt et réponse LLM dans stdout & \texttt{0} \\
+    \bottomrule
+  \end{tabularx}
+  \caption{Variables d'environnement -- backend}
+\end{table}
+
+\textbf{Frontend} (\texttt{frontend/.env}) :
+
+\begin{table}[H]
+  \centering
+  \begin{tabularx}{\textwidth}{l l X l}
+    \toprule
+    \textbf{Variable} & \textbf{Obligatoire} & \textbf{Description} & \textbf{Exemple} \\
+    \midrule
+    \texttt{NEXT\_PUBLIC\_BACKEND\_ENDPOINT} & \textbf{Oui} & URL du backend FastAPI accessible depuis le navigateur. Préfixée \texttt{NEXT\_PUBLIC\_} car exposée côté client. Adapter à l'adresse publique en production & \texttt{http://localhost:8000} \\
+    \bottomrule
+  \end{tabularx}
+  \caption{Variables d'environnement -- frontend}
+\end{table}
+
+
 % ════════════════════════════════════════════════════════════════════════════
 \section{Démarrage avec Docker Compose}
 
